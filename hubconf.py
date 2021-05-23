@@ -122,4 +122,5 @@ if __name__ == '__main__':
 
     results = model(imgs)  # batched inference
     results.print()
+    results.crop()
     results.save()
