@@ -137,7 +137,10 @@ def check_requirements(requirements='requirements.txt', exclude=()):
         except Exception as e:  # DistributionNotFound or VersionConflict if requirements not met
             n += 1
             print(f"{prefix} {r} not found and is required by YOLOv5, attempting auto-update...")
-            print(subprocess.check_output(f"pip install '{r}'", shell=True).decode())
+            try:
+                print(subprocess.check_output(f"pip install '{r}'", shell=True).decode())
+            except Exception as e:
+                print(f'{prefix} {e}')
 
     if n:  # if packages updated
         source = file.resolve() if 'file' in locals() else requirements
@@ -170,12 +173,19 @@ def check_imshow():
 
 
 def check_file(file):
-    # Search for file if not found
-    if Path(file).is_file() or file == '':
+    # Search/download file (if necessary) and return path
+    file = str(file)  # convert to str()
+    if Path(file).is_file() or file == '':  # exists
         return file
-    else:
+    elif file.startswith(('http://', 'https://')):  # download
+        url, file = file, Path(file).name
+        print(f'Downloading {url} to {file}...')
+        torch.hub.download_url_to_file(url, file)
+        assert Path(file).exists() and Path(file).stat().st_size > 0, f'File download failed: {url}'  # check
+        return file
+    else:  # search
         files = glob.glob('./**/' + file, recursive=True)  # find file
-        assert len(files), f'File Not Found: {file}'  # assert file was found
+        assert len(files), f'File not found: {file}'  # assert file was found
         assert len(files) == 1, f"Multiple files match '{file}', specify exact path: {files}"  # assert unique
         return files[0]  # return file
 
