@@ -300,5 +300,10 @@ loss_type=0:Distilling Object Detectors with Fine-grained Feature Imitation 中�
 loss_type =1:IMPROVE OBJECT DETECTION WITH FEATURE - BASED KNOWLEDGE DISTILLATION : TOWARDS ACCURATEND EFFICIENT DETECTOR 中第一部分loss
 
     未开源，目前只实现mask loss & spatial loss 预期近期实现mask loss
+### 知识蒸馏，检测头蒸馏  
+#### 参考paddle蒸馏方式
+$ python train_with_distill_head.py     
+
+
 
 ```

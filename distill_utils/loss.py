@@ -405,7 +405,7 @@ def compute_sup_loss_2(stu_feature,tea_feature,with_mask=False):
 
 
 def compute_sup_loss_3(tech_out,stu_out,weights):
-    # print(tech_out.shape)
+    # Proposed by the paddlepaddle ：
     loss =torch.zeros(1, device=tech_out[0].device)
     for i, pi in enumerate(tech_out):
         # t_location = pi[...,0:4]
