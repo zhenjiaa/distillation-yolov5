@@ -280,10 +280,15 @@ Train
 </summary>
 ```bash  
 python train.py          # 训练原网络  
+
 # 知识蒸馏，特征层面蒸馏  
+
 $ python train_with_distill_feature.py             # 利用yolov5m知识蒸馏yolov5s  
+
 $ python train_with_distill_feature.py --teacher_weight yolov5l.pt --teacher_layer l  # 利用yolov5l知识蒸馏yolov5s
+
 $ python train_with_distill_feature.py --teacher_weight yolov5x.pt --teacher_layer x  # 利用yolov5x知识蒸馏yolov5s
+
 # loss_type 为蒸馏loss选择，
 # 0:Distilling Object Detectors with Fine-grained Feature Imitation 中的loss
     已开源,address:https://github.com/twangnh/Distilling-Object-Detectors
