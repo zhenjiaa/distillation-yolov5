@@ -297,7 +297,7 @@ loss_type=0:Distilling Object Detectors with Fine-grained Feature Imitation 中�
 
     已开源,address:https://github.com/twangnh/Distilling-Object-Detectors
 
-loss_type =1:IMPROVE OBJECT DETECTION WITH FEATURE - BASEDK NOWLEDGE DISTILLATION : TOWARDS ACCURATEND EFFICIENT DETECTOR 中第一部分loss
+loss_type =1:IMPROVE OBJECT DETECTION WITH FEATURE - BASED KNOWLEDGE DISTILLATION : TOWARDS ACCURATEND EFFICIENT DETECTOR 中第一部分loss
 
     未开源，目前只实现mask loss & spatial loss 预期近期实现mask loss
 
