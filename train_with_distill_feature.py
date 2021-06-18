@@ -333,8 +333,10 @@ def train(hyp, opt, device, tb_writer=None):
                     loss *= opt.world_size  # gradient averaged between devices in DDP mode
                 if opt.quad:
                     loss *= 4.
-                # loss_sup,loss_mask_items = compute_sup_loss(stu_feature,tea_feature,sup_mask,0.01)
-                loss_sup,loss_mask_items = compute_sup_loss_2(stu_feature,tea_feature,False)
+                if opt.loss_type == 0:
+                    loss_sup,loss_mask_items = compute_sup_loss(stu_feature,tea_feature,sup_mask,0.01)
+                else:
+                    loss_sup,loss_mask_items = compute_sup_loss_2(stu_feature,tea_feature,False)
                 loss+=loss_sup
                 msup_loss = (msup_loss * i + loss_mask_items) / (i + 1)
 
@@ -489,14 +491,15 @@ def train(hyp, opt, device, tb_writer=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--teacher_weight',type=str,default='yolov5x.pt', help='teacher_weight path')
-    parser.add_argument('--teacher_layer',type=str,default='x', help='teacher_weight path')
+    parser.add_argument('--teacher_weight',type=str,default='yolov5m.pt', help='teacher_weight path')
+    parser.add_argument('--teacher_layer',type=str,default='m', help='teacher layer name')
+    parser.add_argument('--loss_type', type=int, default=1, help='which loss to use')
     parser.add_argument('--weights', type=str, default='yolov5s.pt', help='initial weights path')
     parser.add_argument('--cfg', type=str, default='models/yolov5s.yaml', help='model.yaml path')
     parser.add_argument('--data', type=str, default='data/coco128.yaml', help='data.yaml path')
     parser.add_argument('--hyp', type=str, default='data/hyp.scratch.yaml', help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=300)
-    parser.add_argument('--batch-size', type=int, default=64, help='total batch size for all GPUs')
+    parser.add_argument('--batch-size', type=int, default=2, help='total batch size for all GPUs')
     parser.add_argument('--img-size', nargs='+', type=int, default=[320, 320], help='[train, test] image sizes')
     parser.add_argument('--rect', action='store_true', help='rectangular training')
     parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
