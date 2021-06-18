@@ -301,4 +301,3 @@ loss_type =1:IMPROVE OBJECT DETECTION WITH FEATURE - BASEDK NOWLEDGE DISTILLATIO
     未开源，目前只实现mask loss & spatial loss 预期近期实现mask loss
 
 ```
-</details>
