@@ -281,7 +281,7 @@ Train
 ```bash  
 python train.py          # 训练原网络  
 
-# 知识蒸馏，特征层面蒸馏  
+### 知识蒸馏，特征层面蒸馏  
 
 $ python train_with_distill_feature.py             # 利用yolov5m知识蒸馏yolov5s  
 
@@ -289,10 +289,10 @@ $ python train_with_distill_feature.py --teacher_weight yolov5l.pt --teacher_lay
 
 $ python train_with_distill_feature.py --teacher_weight yolov5x.pt --teacher_layer x  # 利用yolov5x知识蒸馏yolov5s
 
-# loss_type 为蒸馏loss选择，
-# 0:Distilling Object Detectors with Fine-grained Feature Imitation 中的loss
+### loss_type 为蒸馏loss选择，
+#0:Distilling Object Detectors with Fine-grained Feature Imitation 中的loss
     已开源,address:https://github.com/twangnh/Distilling-Object-Detectors
-# 1:IMPROVE OBJECT DETECTION WITH FEATURE - BASEDK NOWLEDGE DISTILLATION : TOWARDS ACCURATEND EFFICIENT DETECTOR 中第一部分loss
+#1:IMPROVE OBJECT DETECTION WITH FEATURE - BASEDK NOWLEDGE DISTILLATION : TOWARDS ACCURATEND EFFICIENT DETECTOR 中第一部分loss
     未开源，目前只实现mask loss & spatial loss 预期近期实现mask loss
 ```
 </details>
