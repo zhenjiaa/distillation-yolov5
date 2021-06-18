@@ -313,7 +313,7 @@ def bbox_overlaps_batch(anchors_, gt_boxes_):
     gt_boxes[:,:,2] = gt_boxes_[:,:,0]+gt_boxes_[:,:,2]/2.0
     gt_boxes[:,:,3] = gt_boxes_[:,:,1]+gt_boxes_[:,:,3]/2.0
     batch_size = gt_boxes.size(0)
-    
+
     if anchors.dim() == 2:
 
         N = anchors.size(0)
@@ -402,3 +402,56 @@ def compute_sup_loss_2(stu_feature,tea_feature,with_mask=False):
         # print(loss)
     loss_item = torch.cat((total_loss,torch.cat(loss_item,0)))
     return total_loss,loss_item
+
+
+def compute_sup_loss_3(tech_out,stu_out,weights):
+    # print(tech_out.shape)
+    loss =torch.zeros(1, device=tech_out[0].device)
+    for i, pi in enumerate(tech_out):
+        # t_location = pi[...,0:4]
+        t_x = pi[...,0]
+        t_y = pi[...,1]
+        t_w = pi[...,2]
+        t_h = pi[...,3]
+        t_obj = pi[...,4]
+        t_cls = pi[...,5:]
+        # s_location = stu_out[i][...,0:4]
+        s_x = stu_out[i][...,0]
+        s_y = stu_out[i][...,1]
+        s_w = stu_out[i][...,2]
+        s_h = stu_out[i][...,3]
+        s_obj = stu_out[i][...,4]
+        s_cls = stu_out[i][...,5:]
+
+        distill_reg_loss = obj_weighted_reg(s_x, s_y, s_w, s_h, t_x, t_y,
+                                            t_w, t_h, t_obj)
+        distill_cls_loss = obj_weighted_cls(s_cls, t_cls, t_obj)*0.5
+        distill_obj_loss = obj_loss(s_obj, t_obj)*0.05
+        distill_loss = distill_reg_loss+distill_cls_loss+distill_obj_loss
+        print(distill_reg_loss,distill_cls_loss,distill_obj_loss)
+        loss +=distill_loss*weights
+    return loss
+    
+def obj_weighted_reg(sx, sy, sw, sh, tx, ty, tw, th, tobj):
+    # print()
+    loss_F= torch.nn.BCEWithLogitsLoss(reduction='none')
+    loss_x = loss_F(sx,torch.sigmoid(tx))
+    loss_y = loss_F(sy,torch.sigmoid(ty))
+    loss_w = torch.abs(sw - tw)
+    loss_h = torch.abs(sh - th)
+    loss = loss_x+loss_y+loss_w+loss_h
+    weighted_loss = torch.mean(loss * torch.sigmoid(tobj))
+    return weighted_loss
+
+def obj_weighted_cls(scls, tcls, tobj):
+    loss_F = torch.nn.BCEWithLogitsLoss(reduction='none')
+    loss= loss_F(scls, torch.sigmoid(tcls))
+    loss = torch.mean(loss,dim=4)
+    weighted_loss = torch.mean(loss*torch.sigmoid(tobj))
+    return weighted_loss
+
+def obj_loss(sobj, tobj):
+    obj_mask = (tobj>0).float()
+    loss_f =torch.nn.BCEWithLogitsLoss(reduction='none')
+    loss = torch.mean(loss_f(sobj, obj_mask))
+    return loss
