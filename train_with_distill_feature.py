@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 def train(hyp, opt, device, tb_writer=None):
 
-    teach_model = attempt_load('yolov5m.pt', map_location=device)  # load FP32 model
+    teach_model = attempt_load(opt.teacher_weight, map_location=device)  # load FP32 model
     gs = max(int(teach_model.stride.max()), 32)  # grid size (max stride)
     imgsz = check_img_size(opt.img_size[1], s=gs)  # check img_size
     teach_model.eval()
@@ -93,11 +93,16 @@ def train(hyp, opt, device, tb_writer=None):
 
     # Model
     pretrained = weights.endswith('.pt')
+    tea_channel = [192,384,192]
+    if opt.teacher_layer =='l':
+        tea_channel = [256,512,256]
+    elif opt.teacher_layer =='x':
+        tea_channel = [320,640,320]
     if pretrained:
         with torch_distributed_zero_first(rank):
             attempt_download(weights)  # download if not found locally
         ckpt = torch.load(weights, map_location=device)  # load checkpoint
-        model = dist_model(cfg=opt.cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
+        model = dist_model(cfg=opt.cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors'),tea_channel=tea_channel).to(device)  # create
         exclude = ['anchor'] if (opt.cfg or hyp.get('anchors')) and not opt.resume else []  # exclude keys
         state_dict = ckpt['model'].float().state_dict()  # to FP32
         state_dict = intersect_dicts(state_dict, model.state_dict(), exclude=exclude)  # intersect
@@ -484,13 +489,14 @@ def train(hyp, opt, device, tb_writer=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--teacher_weight',type=str,default='yolov5m.pt', help='teacher_weight path')
+    parser.add_argument('--teacher_weight',type=str,default='yolov5x.pt', help='teacher_weight path')
+    parser.add_argument('--teacher_layer',type=str,default='x', help='teacher_weight path')
     parser.add_argument('--weights', type=str, default='yolov5s.pt', help='initial weights path')
     parser.add_argument('--cfg', type=str, default='models/yolov5s.yaml', help='model.yaml path')
     parser.add_argument('--data', type=str, default='data/coco128.yaml', help='data.yaml path')
     parser.add_argument('--hyp', type=str, default='data/hyp.scratch.yaml', help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=300)
-    parser.add_argument('--batch-size', type=int, default=2, help='total batch size for all GPUs')
+    parser.add_argument('--batch-size', type=int, default=64, help='total batch size for all GPUs')
     parser.add_argument('--img-size', nargs='+', type=int, default=[320, 320], help='[train, test] image sizes')
     parser.add_argument('--rect', action='store_true', help='rectangular training')
     parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')

@@ -273,5 +273,13 @@ For issues running YOLOv5 please visit [GitHub Issues](https://github.com/ultral
 <br>
 
 
-# <div align="center">Knowledge Distillation</div>
-python tra
+### <div align="center">Knowledge Distillation</div>
+<details open>
+<summary>
+Train
+</summary>dw a
+```bash
+python train.py          # 训练原网络
+python train_with_distill_feature.py            # 利用yolov5m知识蒸馏
+```
+</details>
