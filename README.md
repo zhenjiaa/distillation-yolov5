@@ -304,6 +304,9 @@ loss_type =1:IMPROVE OBJECT DETECTION WITH FEATURE - BASED KNOWLEDGE DISTILLATIO
 #### 参考paddle蒸馏方式
 $ python train_with_distill_head.py     
 
-
-
 ```
+
+
+<summary>
+Test & Inference 无改变
+</summary>
