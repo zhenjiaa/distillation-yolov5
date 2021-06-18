@@ -278,8 +278,10 @@ For issues running YOLOv5 please visit [GitHub Issues](https://github.com/ultral
 <summary>
 Train
 </summary>
-```bash  
-python train.py          # 训练原网络  
+```bash
+
+### 直接训练
+$ python train.py
 
 ### 知识蒸馏，特征层面蒸馏  
 
@@ -289,7 +291,7 @@ $ python train_with_distill_feature.py --teacher_weight yolov5l.pt --teacher_lay
 
 $ python train_with_distill_feature.py --teacher_weight yolov5x.pt --teacher_layer x  # 利用yolov5x知识蒸馏yolov5s
 
-### loss_type 为蒸馏loss选择，
+#### loss_type 为蒸馏loss选择，
 #0:Distilling Object Detectors with Fine-grained Feature Imitation 中的loss
     已开源,address:https://github.com/twangnh/Distilling-Object-Detectors
 #1:IMPROVE OBJECT DETECTION WITH FEATURE - BASEDK NOWLEDGE DISTILLATION : TOWARDS ACCURATEND EFFICIENT DETECTOR 中第一部分loss
