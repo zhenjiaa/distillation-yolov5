@@ -270,7 +270,8 @@ For issues running YOLOv5 please visit [GitHub Issues](https://github.com/ultral
         <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-instagram.png" width="3%"/>
     </a>
 </div>
-## <div align="center">Knowledge Distillation</div>
-<div align="left">
-<a></a>
-</div>
+<br>
+
+
+# <div align="center">Knowledge Distillation</div>
+python tra
