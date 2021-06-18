@@ -277,7 +277,7 @@ For issues running YOLOv5 please visit [GitHub Issues](https://github.com/ultral
 <details open>
 <summary>
 Train
-</summary>dw a
+</summary>
 ```bash
 python train.py          # 训练原网络
 # 知识蒸馏，特征层面蒸馏
