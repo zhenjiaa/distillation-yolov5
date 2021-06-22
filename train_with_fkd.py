@@ -25,14 +25,14 @@ from tqdm import tqdm
 
 import test  # import test.py to get mAP after each epoch
 from models.experimental import attempt_load
-from distill_utils.yolo import dist_model
+from distill_utils.fkd_yolo import dist_model
 from utils.autoanchor import check_anchors
 from utils.datasets import create_dataloader
 from utils.general import labels_to_class_weights, increment_path, labels_to_image_weights, init_seeds, \
     fitness, strip_optimizer, get_latest_run, check_dataset, check_file, check_git_status, check_img_size, \
     check_requirements, print_mutation, set_logging, one_cycle, colorstr
 from utils.google_utils import attempt_download
-from distill_utils.loss import ComputeLoss,compute_sup_loss,compute_sup_loss_2,compute_sup_loss_2_mine
+from distill_utils.loss import ComputeLoss
 from utils.plots import plot_images, plot_labels, plot_results, plot_evolution
 from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_distributed_zero_first, is_parallel
 from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
@@ -114,7 +114,7 @@ def train(hyp, opt, device, tb_writer=None):
         check_dataset(data_dict)  # check
     train_path = data_dict['train']
     test_path = data_dict['val']
-    model.init_stu_adap(0,0.0001,True)
+    model.init_compute_loss_module(0,0.0001)
 
     # Freeze
     freeze = []  # parameter names to freeze (full or partial)
@@ -287,7 +287,7 @@ def train(hyp, opt, device, tb_writer=None):
         # dataset.mosaic_border = [b - imgsz, -b]  # height, width borders
 
         mloss = torch.zeros(4, device=device)  # mean losses
-        msup_loss = torch.zeros(4,device=device)
+        msup_loss = torch.zeros(5,device=device)
         if rank != -1:
             dataloader.sampler.set_epoch(epoch)
         pbar = enumerate(dataloader)
@@ -322,21 +322,12 @@ def train(hyp, opt, device, tb_writer=None):
             with amp.autocast(enabled=cuda):
                 _,tea_feature= teach_model(imgs,sup=True)
                 pred,stu_feature = model(imgs,sup=True)  # forward
-                for i in range(len(stu_feature)):
-                    if isinstance(model,torch.nn.DataParallel):
-                        stu_feature[i] = model.module._stu_feature_adap[i](stu_feature[i])
-                    else:
-                        stu_feature[i] = model._stu_feature_adap[i](stu_feature[i])
-                    # print(stu_feature[i].shape,tea_feature[i].shape)
                 sup_mask,loss, loss_items = compute_loss(pred, targets.to(device),mask=True)  # loss scaled by batch_size
                 if rank != -1:
                     loss *= opt.world_size  # gradient averaged between devices in DDP mode
                 if opt.quad:
                     loss *= 4.
-                if opt.loss_type == 0:
-                    loss_sup,loss_mask_items = compute_sup_loss(stu_feature,tea_feature,sup_mask,0.01)
-                else:
-                    loss_sup,loss_mask_items = compute_sup_loss_2(stu_feature,tea_feature,False)
+                loss_sup,loss_mask_items = model.compute_kd_loss(stu_feature,tea_feature)
                 loss+=loss_sup
                 msup_loss = (msup_loss * i + loss_mask_items) / (i + 1)
 
@@ -406,16 +397,10 @@ def train(hyp, opt, device, tb_writer=None):
 
             # Log
             tags = ['train/box_loss', 'train/obj_loss', 'train/cls_loss',  # train loss
-                    'train/sup_loss','train/sup_loss_1','train/sup_loss_3','train/sup_loss_2',
+                    'train/kd_loss','train/kd_spatial_loss','train/kd_feat_loss','train/kd_channel_loss','train/kd_nonlocal_loss',
                     'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/mAP_0.5:0.95',
                     'val/box_loss', 'val/obj_loss', 'val/cls_loss',  # val loss
                     'x/lr0', 'x/lr1', 'x/lr2']  # params
-            if opt.loss_type ==1:
-                        tags = ['train/box_loss', 'train/obj_loss', 'train/cls_loss',  # train loss
-                        'train/sup_loss','train/kd_feat_loss','train/kd_channel_loss','train/kd_spatial_loss',
-                        'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/mAP_0.5:0.95',
-                        'val/box_loss', 'val/obj_loss', 'val/cls_loss',  # val loss
-                        'x/lr0', 'x/lr1', 'x/lr2']
             for x, tag in zip(list(mloss[:-1])+list(msup_loss) + list(results) + lr, tags):
                 if tb_writer:
                     tb_writer.add_scalar(tag, x, epoch)  # tensorboard
@@ -473,8 +458,7 @@ def train(hyp, opt, device, tb_writer=None):
                                           dataloader=testloader,
                                           save_dir=save_dir,
                                           save_json=True,
-                                          plots=False,
-                                          is_coco=is_coco)
+                                          plots=False)
 
         # Strip optimizers
         final = best if best.exists() else last  # final model

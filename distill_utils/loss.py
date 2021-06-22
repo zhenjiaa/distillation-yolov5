@@ -3,7 +3,7 @@
 from traceback import print_tb
 from unicodedata import decimal
 import torch
-from torch._C import ThroughputBenchmark, set_flush_denormal
+from torch._C import Size, ThroughputBenchmark, set_flush_denormal
 from torch.cuda import device
 import torch.nn as nn
 
@@ -370,24 +370,27 @@ def compute_sup_loss(stu_feature,tea_feature,sup_mask,weight_):
     loss_item = torch.cat((total_loss,torch.cat(loss_item,0)))
     return total_loss,loss_item
 
-def compute_sup_loss_2(stu_feature,tea_feature,with_mask=False):
+
+def compute_sup_loss_2_mine(stu_feature,tea_feature,with_mask=False):
     # Proposed by the paper ：
     # IMPROVE OBJECT DETECTION WITH FEATURE - BASED KNOWLEDGE DISTILLATION : TOWARDS A CCURATE AND EFFICIENT DETECTORS
+    # Code according to my own understanding (use avg_poolling to compute mask)
     import torch.nn.functional as F 
     device = stu_feature[0].device
     bs = stu_feature[0].shape[0]
-    loss_func = nn.MSELoss()
+    loss_func = torch.dist
     total_loss = torch.zeros(1).to(device)
     loss_item = []
 
     for i in range(len(stu_feature)):
         # compute the spatial mask
 
-        stu_feature_spa = stu_feature[i].view(bs,stu_feature[i].shape[2]*stu_feature[i].shape[2],-1).contiguous()  
-        tea_feature_spa = tea_feature[i].view(bs,tea_feature[i].shape[2]*tea_feature[i].shape[2],-1).contiguous()
+        stu_feature_spa = stu_feature[i].permute((0,2,3,1)).view(bs,stu_feature[i].shape[2]*stu_feature[i].shape[2],-1).contiguous()  
+        tea_feature_spa = tea_feature[i].permute((0,2,3,1)).view(bs,tea_feature[i].shape[2]*tea_feature[i].shape[2],-1).contiguous()
 
         stu_mask_spa = F.avg_pool1d(stu_feature_spa,stu_feature_spa.shape[2]).view(bs,stu_feature[i].shape[2],stu_feature[i].shape[2])
         tea_mask_spa = F.avg_pool1d(tea_feature_spa,tea_feature_spa.shape[2]).view(bs,stu_feature[i].shape[2],stu_feature[i].shape[2])
+        # ss = torch.mean(tea_feature[i],[1])
 
         loss_mask_spa = loss_func(stu_mask_spa,tea_mask_spa).view(1)         # loss_mask_spa
 
@@ -398,10 +401,88 @@ def compute_sup_loss_2(stu_feature,tea_feature,with_mask=False):
         loss_mask_channel =loss_func(stu_mask_channel,tea_mask_channel).view(1)                # loss_mask_channel
 
         loss_item.append(loss_mask_channel+loss_mask_spa)
-        total_loss = total_loss +loss_mask_channel+loss_mask_spa
+        total_loss = (total_loss +loss_mask_channel+loss_mask_spa)* 4e-3 * 6
         # print(loss)
+        print(stu_feature[i].shape,stu_mask_spa.shape,stu_mask_channel.shape)
+
     loss_item = torch.cat((total_loss,torch.cat(loss_item,0)))
     return total_loss,loss_item
+
+
+
+
+def dist2(tensor_a, tensor_b, attention_mask=None, channel_attention_mask=None):
+    diff = (tensor_a - tensor_b) ** 2
+    #   print(diff.size())      batchsize x 1 x W x H,
+    #   print(attention_mask.size()) batchsize x 1 x W x H
+    diff = diff * attention_mask
+    diff = diff * channel_attention_mask
+    diff = torch.sum(diff) ** 0.5
+    return diff
+
+def compute_sup_loss_2(stu_feature,tea_feature,with_mask=False):
+    t = 0.1
+    c_t = 0.1
+    s_ratio = 1.0
+    c_s_ratio = 1.0
+    
+    kd_spatial_loss = 0
+    kd_channel_loss = 0
+    kd_feat_loss = 0
+    bs = stu_feature[0].size(0)
+    for i in range(len(stu_feature)):
+        t_attention_mask = torch.mean(torch.abs(tea_feature[i]),[1],keepdim=True)
+        size = t_attention_mask.size()
+        t_attention_mask = t_attention_mask.view(bs, -1)
+        t_attention_mask = torch.softmax(t_attention_mask / t, dim=1) * size[-1] * size[-2]
+        t_attention_mask = t_attention_mask.view(size)
+
+        s_attention_mask = torch.mean(torch.abs(stu_feature[i]), [1], keepdim=True)
+        size = s_attention_mask.size()
+        s_attention_mask = s_attention_mask.view(bs, -1)
+        s_attention_mask = torch.softmax(s_attention_mask / t, dim=1) * size[-1] * size[-2]
+        s_attention_mask = s_attention_mask.view(size)
+
+        c_t_attention_mask = torch.mean(torch.abs(tea_feature[i]), [2, 3], keepdim=True)  # 2 x 256 x 1 x1
+        c_size = c_t_attention_mask.size()
+        c_t_attention_mask = c_t_attention_mask.view(bs, -1)  # 2 x 256
+        c_t_attention_mask = torch.softmax(c_t_attention_mask / c_t, dim=1) * 256
+        c_t_attention_mask = c_t_attention_mask.view(c_size)  # 2 x 256 -> 2 x 256 x 1 x 1
+
+        c_s_attention_mask = torch.mean(torch.abs(stu_feature[i]), [2, 3], keepdim=True)  # 2 x 256 x 1 x1
+        c_size = c_s_attention_mask.size()
+        c_s_attention_mask = c_s_attention_mask.view(bs, -1)  # 2 x 256
+        c_s_attention_mask = torch.softmax(c_s_attention_mask / c_t, dim=1) * 256
+        c_s_attention_mask = c_s_attention_mask.view(c_size)  # 2 x 256 -> 2 x 256 x 1 x 1
+
+        sum_attention_mask = (t_attention_mask + s_attention_mask * s_ratio) / (1 + s_ratio)
+        sum_attention_mask = sum_attention_mask.detach()
+
+        c_sum_attention_mask = (c_t_attention_mask + c_s_attention_mask * c_s_ratio) / (1 + c_s_ratio)
+        c_sum_attention_mask = c_sum_attention_mask.detach()
+
+        kd_feat_loss += dist2(tea_feature[i],stu_feature[i], attention_mask=sum_attention_mask,
+        channel_attention_mask=c_sum_attention_mask) * 7e-5 * 6
+
+        kd_channel_loss += torch.dist(torch.mean(tea_feature[i], [2, 3]),(torch.mean(stu_feature[i], [2, 3]))) * 4e-3 * 6
+
+        t_spatial_pool = torch.mean(tea_feature[i], [1]).view(tea_feature[i].size(0), 1, tea_feature[i].size(2),
+                                                    tea_feature[i].size(3))
+        s_spatial_pool = torch.mean(stu_feature[i], [1]).view(stu_feature[i].size(0), 1, stu_feature[i].size(2),
+                                                        stu_feature[i].size(3))
+
+        kd_spatial_loss += torch.dist(t_spatial_pool, s_spatial_pool) * 4e-3 * 6
+
+
+    kd_spatial_loss = kd_spatial_loss.view(1)
+    kd_channel_loss = kd_channel_loss.view(1)
+    kd_feat_loss = kd_feat_loss.view(1)
+
+    losses = kd_spatial_loss+kd_channel_loss+kd_feat_loss
+    loss_item = torch.cat((losses,kd_feat_loss,kd_channel_loss,kd_spatial_loss),0)
+    return losses,loss_item
+
+
 
 
 def compute_sup_loss_3(tech_out,stu_out,weights):
