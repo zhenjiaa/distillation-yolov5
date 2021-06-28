@@ -1,5 +1,6 @@
+from torch import tensor
 from torch._C import set_flush_denormal
-from torch.cuda import init
+from torch.cuda import device, init
 from models.yolo import Model
 import torch.nn as nn
 import torch
@@ -120,13 +121,14 @@ class dist_model(Model):
 
         # self.init_stu_adap(0,0.0001,True)
     def compute_kd_loss(self,s_feats,t_feats):
+        device = s_feats[0].device
         x = s_feats
         t = 0.1
         s_ratio = 1.0
-        kd_feat_loss = 0
-        kd_channel_loss = 0
-        kd_spatial_loss = 0
-        kd_nonlocal_loss = 0
+        kd_feat_loss = torch.zeros(1).to(device)
+        kd_channel_loss = torch.zeros(1).to(device)
+        kd_spatial_loss = torch.zeros(1).to(device)
+        kd_nonlocal_loss = torch.zeros(1).to(device)
 
         #   for channel attention
         c_t = 0.1
@@ -165,8 +167,10 @@ class dist_model(Model):
 
             kd_feat_loss += dist2(t_feats[_i], self.adaptation_layers[_i](x[_i]), attention_mask=sum_attention_mask,
                                     channel_attention_mask=c_sum_attention_mask) * 7e-5 * 6
+
             kd_channel_loss += torch.dist(torch.mean(t_feats[_i], [2, 3]),
                                             self.channel_wise_adaptation[_i](torch.mean(x[_i], [2, 3]))) * 4e-3 * 6
+
             t_spatial_pool = torch.mean(t_feats[_i], [1]).view(t_feats[_i].size(0), 1, t_feats[_i].size(2),
                                                                 t_feats[_i].size(3))
             s_spatial_pool = torch.mean(x[_i], [1]).view(x[_i].size(0), 1, x[_i].size(2),
@@ -177,7 +181,7 @@ class dist_model(Model):
         for _i in range(len(t_feats)):
             s_relation = self.student_non_local[_i](x[_i])
             t_relation = self.teacher_non_local[_i](t_feats[_i])
-            kd_nonlocal_loss += torch.dist(self.non_local_adaptation[_i](s_relation), t_relation, p=2)
+            kd_nonlocal_loss += torch.dist(self.non_local_adaptation[_i](s_relation), t_relation, p=2) * 7e-5 * 6
         losses = kd_spatial_loss.view(1)+kd_feat_loss.view(1)+kd_channel_loss.view(1)+kd_nonlocal_loss.view(1)
         loss_item = torch.cat((losses,kd_spatial_loss.view(1),kd_feat_loss.view(1),kd_channel_loss.view(1),kd_nonlocal_loss.view(1)),0)
         return losses,loss_item
