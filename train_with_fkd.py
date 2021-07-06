@@ -115,6 +115,7 @@ def train(hyp, opt, device, tb_writer=None):
     train_path = data_dict['train']
     test_path = data_dict['val']
     model.init_compute_loss_module(0,0.0001)
+    print(model)
 
     # Freeze
     freeze = []  # parameter names to freeze (full or partial)

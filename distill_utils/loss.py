@@ -10,6 +10,7 @@ import torch.nn as nn
 from utils.general import bbox_iou
 from utils.torch_utils import is_parallel
 import numpy as np
+import torch.nn.functional as F
 
 
 def smooth_BCE(eps=0.1):  # https://github.com/ultralytics/yolov3/issues/238#issuecomment-598028441
@@ -504,9 +505,9 @@ def compute_sup_loss_3(tech_out,stu_out,weights):
         s_obj = stu_out[i][...,4]
         s_cls = stu_out[i][...,5:]
 
-        distill_reg_loss = obj_weighted_reg(s_x, s_y, s_w, s_h, t_x, t_y,
+        distill_reg_loss = obj_weighted_reg_mine(s_x, s_y, s_w, s_h, t_x, t_y,
                                             t_w, t_h, t_obj)
-        distill_cls_loss = obj_weighted_cls(s_cls, t_cls, t_obj)*0.5
+        distill_cls_loss = obj_weighted_cls_mine(s_cls, t_cls, t_obj)*0.5
         distill_obj_loss = obj_loss(s_obj, t_obj)*0.05
         distill_loss = distill_reg_loss+distill_cls_loss+distill_obj_loss
         print(distill_reg_loss,distill_cls_loss,distill_obj_loss)
@@ -524,9 +525,28 @@ def obj_weighted_reg(sx, sy, sw, sh, tx, ty, tw, th, tobj):
     weighted_loss = torch.mean(loss * torch.sigmoid(tobj))
     return weighted_loss
 
+    
+def obj_weighted_reg_mine(sx, sy, sw, sh, tx, ty, tw, th, tobj):
+    # print()
+    loss_F= torch.nn.MSELoss(reduction='none')
+    loss_x = loss_F(torch.sigmoid(sx),torch.sigmoid(tx))
+    loss_y = loss_F(torch.sigmoid(sy),torch.sigmoid(ty))
+    loss_w = torch.abs(sw - tw)
+    loss_h = torch.abs(sh - th)
+    loss = loss_x+loss_y+loss_w+loss_h
+    weighted_loss = torch.mean(loss * torch.sigmoid(tobj))
+    return weighted_loss
+
 def obj_weighted_cls(scls, tcls, tobj):
     loss_F = torch.nn.BCEWithLogitsLoss(reduction='none')
     loss= loss_F(scls, torch.sigmoid(tcls))
+    loss = torch.mean(loss,dim=4)
+    weighted_loss = torch.mean(loss*torch.sigmoid(tobj))
+    return weighted_loss
+
+def obj_weighted_cls_mine(scls, tcls, tobj):
+    loss_F = torch.nn.BCEWithLogitsLoss(reduction='none')
+    loss= loss_F(torch.sigmoid(scls), torch.sigmoid(tcls))
     loss = torch.mean(loss,dim=4)
     weighted_loss = torch.mean(loss*torch.sigmoid(tobj))
     return weighted_loss

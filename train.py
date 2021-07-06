@@ -470,8 +470,8 @@ if __name__ == '__main__':
     parser.add_argument('--data', type=str, default='data/coco128.yaml', help='dataset.yaml path')
     parser.add_argument('--hyp', type=str, default='data/hyp.scratch.yaml', help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=300)
-    parser.add_argument('--batch-size', type=int, default=64, help='total batch size for all GPUs')
-    parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='[train, test] image sizes')
+    parser.add_argument('--batch-size', type=int, default=2, help='total batch size for all GPUs')
+    parser.add_argument('--img-size', nargs='+', type=int, default=[320, 320], help='[train, test] image sizes')
     parser.add_argument('--rect', action='store_true', help='rectangular training')
     parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
     parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
@@ -505,9 +505,9 @@ if __name__ == '__main__':
     opt.world_size = int(getattr(os.environ, 'WORLD_SIZE', 1))
     opt.global_rank = int(getattr(os.environ, 'RANK', -1))
     set_logging(opt.global_rank)
-    if opt.global_rank in [-1, 0]:
-        check_git_status()
-        check_requirements(exclude=['thop'])
+    # if opt.global_rank in [-1, 0]:
+    #     check_git_status()
+    #     check_requirements(exclude=['thop'])
 
     # Resume
     wandb_run = check_wandb_resume(opt)
